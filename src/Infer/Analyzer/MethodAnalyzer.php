@@ -27,10 +27,10 @@ class MethodAnalyzer
 
     public function analyze(FunctionLikeDefinition $methodDefinition)
     {
-        $scope = $this->traverseClassMethod(
-            [$this->getClassReflector()->getMethod($methodDefinition->type->name)->getAstNode()],
-            $methodDefinition,
-        );
+        $method = $this->getClassReflector()->getMethod($methodDefinition->type->name);
+        $methodNode = $method->getAstNode();
+
+        $scope = $this->traverseClassMethod([$methodNode], $methodDefinition);
 
         $methodDefinition = $this->index
             ->getClassDefinition($this->classDefinition->name)
@@ -41,6 +41,7 @@ class MethodAnalyzer
         return new MethodAnalysisResult(
             scope: $scope,
             definition: $methodDefinition,
+            methodNode: $methodNode,
         );
     }
 

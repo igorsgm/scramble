@@ -5,11 +5,16 @@ namespace Dedoc\Scramble\Infer\Reflector;
 use Dedoc\Scramble\Infer\Services\FileNameResolver;
 use Dedoc\Scramble\Infer\Services\FileParser;
 use Dedoc\Scramble\Infer\Visitors\PhpDocResolver;
+use Dedoc\Scramble\Support\PhpDoc;
 use PhpParser\Node;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\NodeFinder;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\NameResolver;
+use PHPStan\PhpDocParser\Ast\PhpDoc\PhpDocTagNode;
+use PHPStan\PhpDocParser\Ast\PhpDoc\ReturnTagValue;
+use PHPStan\PhpDocParser\Ast\PhpDoc\ReturnTagValueNode;
+use PHPStan\PhpDocParser\Ast\Type\IdentifierTypeNode;
 use ReflectionMethod;
 
 class MethodReflector
@@ -69,7 +74,7 @@ class MethodReflector
 
             $className = class_basename($this->className);
 
-            $methodDoc = $this->getReflection()->getDocComment() ?: '';
+            $methodDoc = $this->methodDocs($reflection);
             $partialClass = "<?php\nclass $className {\n".$methodDoc."\n".$this->getMethodCode($reflection)."\n}";
 
             $statements = $this->parser->parseContent($partialClass)->getStatements();
@@ -109,5 +114,54 @@ class MethodReflector
     public function getClassReflector(): ClassReflector
     {
         return ClassReflector::make($this->className);
+    }
+
+
+    /**
+     * Retrieves the method's docblock and updates the "@return" tag if necessary, by considering the value of
+     * the "@method" tag in the class docblock.
+     */
+    private function methodDocs(ReflectionMethod $reflection)
+    {
+        $methodName = $reflection->getName();
+
+        $classDoc = $reflection->getDeclaringClass()->getDocComment() ?: '';
+        $methodDoc = $reflection->getDocComment() ?: '';
+
+        if (!str_contains($classDoc, $methodName) || !str_contains($classDoc, '@method')) {
+            return $methodDoc;
+        }
+
+        $parsedClassDoc = PhpDoc::parse($classDoc);
+        $parsedMethodDoc = PhpDoc::parse($methodDoc ?: '/** */');
+
+        $methodTagValues = $parsedClassDoc->getMethodTagValues();
+
+        foreach ($methodTagValues as $methodTag) {
+            if ($methodTag->methodName !== $methodName) {
+                continue;
+            }
+
+            if (! $returnTypeName = $methodTag->returnType?->name) {
+                break;
+            }
+
+            foreach ($parsedMethodDoc->getTags() as $tag) {
+                if ($tag->value instanceof ReturnTagValueNode) {
+                    // Update the existing @return tag
+                    $tag->value->type = new IdentifierTypeNode($returnTypeName);
+                    $tag->value->description = $methodTag->description ?: $tag->value->description;
+                    break 2;
+                }
+            }
+
+            // Add a new @return tag because it doesn't exist yet
+            $parsedMethodDoc->children[] = new PhpDocTagNode('@return',
+                new ReturnTagValueNode(new IdentifierTypeNode($returnTypeName), $methodTag->description)
+            );
+
+        }
+
+        return (string) $parsedMethodDoc;
     }
 }

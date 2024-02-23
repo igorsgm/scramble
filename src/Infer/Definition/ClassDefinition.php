@@ -9,6 +9,7 @@ use Dedoc\Scramble\Infer\Scope\Scope;
 use Dedoc\Scramble\Infer\Scope\ScopeContext;
 use Dedoc\Scramble\Infer\Services\FileNameResolver;
 use Dedoc\Scramble\Infer\Services\ReferenceTypeResolver;
+use Dedoc\Scramble\PhpDoc\PhpDocTypeHelper;
 use Dedoc\Scramble\Support\Type\Generic;
 use Dedoc\Scramble\Support\Type\ObjectType;
 use Dedoc\Scramble\Support\Type\TemplateType;
@@ -17,10 +18,12 @@ use Dedoc\Scramble\Support\Type\TypeWalker;
 use Dedoc\Scramble\Support\Type\UnknownType;
 use PhpParser\ErrorHandler\Throwing;
 use PhpParser\NameContext;
+use PHPStan\PhpDocParser\Ast\PhpDoc\PhpDocNode;
 
 class ClassDefinition
 {
     private array $methodsScopes = [];
+    private array $methodsNodes = [];
 
     public function __construct(
         // FQ name
@@ -45,7 +48,7 @@ class ClassDefinition
         return $this->isInstanceOf($className) && $this->name !== $className;
     }
 
-    public function getMethodDefinition(string $name, Scope $scope = new GlobalScope)
+    public function getMethodDefinition(string $name, Scope $scope = new GlobalScope): ?FunctionLikeDefinition
     {
         if (! array_key_exists($name, $this->methods)) {
             return null;
@@ -60,6 +63,7 @@ class ClassDefinition
             ))->analyze($methodDefinition);
 
             $this->methodsScopes[$name] = $result->scope;
+            $this->methodsNodes[$name] = $result->methodNode;
             $this->methods[$name] = $result->definition;
         }
 
@@ -71,11 +75,18 @@ class ClassDefinition
         );
 
         if (ReferenceTypeResolver::hasResolvableReferences($returnType = $this->methods[$name]->type->getReturnType())) {
-            $this->methods[$name]->type->setReturnType(
-                (new ReferenceTypeResolver($scope->index))
-                    ->resolve($methodScope, $returnType)
-                    ->mergeAttributes($returnType->attributes())
-            );
+            $returnType = (new ReferenceTypeResolver($scope->index))
+                ->resolve($methodScope, $returnType)
+                ->mergeAttributes($returnType->attributes());
+
+            $this->methods[$name]->type->setReturnType($returnType);
+        }
+
+        if ($returnType instanceof UnknownType) {
+            // PHP Doc return type is considered only if the code return type is unknown
+            $phpDocType = $this->getMethodDocReturnType($name);
+            $returnType = $phpDocType ? PhpDocTypeHelper::toType($phpDocType) : $returnType;
+            $this->methods[$name]->type->setReturnType($returnType);
         }
 
         return $this->methods[$name];
@@ -101,6 +112,40 @@ class ClassDefinition
         }
 
         return $this->replaceTemplateInType($type, $calledOn->templateTypesMap)->getReturnType();
+    }
+
+    /**
+     * @TODO: Leverage code of RouteInfo class
+     */
+    public function getMethodDocReturnType(string $name)
+    {
+        if (! $phpDoc = $this->methodPhpDoc($name)) {
+            return null;
+        }
+
+        if (($responseType = $phpDoc->getReturnTagValues('@response')[0] ?? null) && optional($responseType)->type) {
+            $responseType->type->setAttribute('source', 'response');
+
+            return $responseType->type;
+        }
+
+        if (($returnType = $phpDoc->getReturnTagValues()[0] ?? null) && optional($returnType)->type) {
+            return $returnType->type;
+        }
+
+        return null;
+    }
+
+    /**
+     * @TODO: Leverage code of RouteInfo class
+     */
+    public function methodPhpDoc(string $name): PhpDocNode
+    {
+        if (!$methodNode = $this->methodsNodes[$name]) {
+            return new PhpDocNode([]);
+        }
+
+        return $methodNode->getAttribute('parsedPhpDoc') ?: new PhpDocNode([]);
     }
 
     private function replaceTemplateInType(Type $type, array $templateTypesMap)

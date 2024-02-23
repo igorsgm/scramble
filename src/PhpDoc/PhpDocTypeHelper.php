@@ -17,6 +17,7 @@ use Dedoc\Scramble\Support\Type\ObjectType;
 use Dedoc\Scramble\Support\Type\StringType;
 use Dedoc\Scramble\Support\Type\Union;
 use Dedoc\Scramble\Support\Type\UnknownType;
+use Illuminate\Support\Collection;
 use PHPStan\PhpDocParser\Ast\ConstExpr\ConstExprFloatNode;
 use PHPStan\PhpDocParser\Ast\ConstExpr\ConstExprIntegerNode;
 use PHPStan\PhpDocParser\Ast\ConstExpr\ConstExprStringNode;
@@ -62,7 +63,7 @@ class PhpDocTypeHelper
         }
 
         if ($type instanceof GenericTypeNode) {
-            if ($type->type->name === 'array') {
+            if (in_array($type->type->name, ['array', 'non-empty-array', 'Collection']) || is_a($type->type->name, Collection::class, true)) {
                 return static::toType(new ArrayShapeNode(
                     array_map(
                         fn ($type) => new ArrayShapeItemNode(null, false, $type),
@@ -139,7 +140,7 @@ class PhpDocTypeHelper
             // @todo: Scalar variables are those containing an int, float, string or bool.
             return new StringType;
         }
-        if ($type->name === 'array') {
+        if (in_array($type->name, ['array', 'non-empty-array', 'Collection'])) {
             return new ArrayType;
         }
         if ($type->name === 'object') {
