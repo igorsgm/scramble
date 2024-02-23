@@ -206,7 +206,11 @@ class RequestEssentialsExtension extends OperationExtension
             ];
             $schemaType = $type ? ($schemaTypesMap[$type] ?? new IntegerType) : new StringType;
 
-            $isModelId = $type && ! isset($schemaTypesMap[$type]);
+            if ($isEnum = enum_exists($type)) {
+                $schemaType = (new StringType())->enum($type::cases());
+            }
+
+            $isModelId = $type && !$isEnum && ! isset($schemaTypesMap[$type]);
 
             if ($isModelId) {
                 [$schemaType, $description] = $this->getModelIdTypeAndDescription($schemaType, $type, $paramName, $description, $route->bindingFields()[$paramName] ?? null);
