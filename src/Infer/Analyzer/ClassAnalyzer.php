@@ -7,6 +7,7 @@ use Dedoc\Scramble\Infer\Definition\ClassPropertyDefinition;
 use Dedoc\Scramble\Infer\Definition\FunctionLikeDefinition;
 use Dedoc\Scramble\Infer\Scope\Index;
 use Dedoc\Scramble\Support\Type\FunctionType;
+use Dedoc\Scramble\Support\Type\ObjectType;
 use Dedoc\Scramble\Support\Type\TemplateType;
 use Dedoc\Scramble\Support\Type\TypeHelper;
 use Dedoc\Scramble\Support\Type\UnknownType;
@@ -56,13 +57,26 @@ class ClassAnalyzer
                         : new UnknownType,
                 );
             } else {
+
+                // Analyze class properties if they are classes (ie: dependency injections)
+                $type = null;
+                if ($reflectionProperty->getType() instanceof \ReflectionNamedType && class_exists($typeName = $reflectionProperty->getType()->getName())) {
+                    $this->analyze($typeName);
+                    $type = new ObjectType($typeName);
+                }
+
+                $t = null;
                 $classDefinition->properties[$reflectionProperty->name] = new ClassPropertyDefinition(
-                    type: $t = new TemplateType('T'.Str::studly($reflectionProperty->name)),
-                    defaultType: $reflectionProperty->hasDefaultValue()
+                    type: $type ?: $t = new TemplateType('T'.Str::studly($reflectionProperty->name)),
+                    defaultType: $type ?: ($reflectionProperty->hasDefaultValue()
                         ? TypeHelper::createTypeFromValue($reflectionProperty->getDefaultValue())
-                        : null,
+                        : null),
                 );
-                $classDefinition->templateTypes[] = $t;
+
+                if ($t) {
+                    $classDefinition->templateTypes[] = $t;
+                }
+
             }
         }
 
