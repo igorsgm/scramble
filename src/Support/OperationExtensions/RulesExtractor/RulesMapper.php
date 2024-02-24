@@ -14,6 +14,7 @@ use Dedoc\Scramble\Support\Type\ObjectType;
 use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
 use Illuminate\Validation\Rules\Enum;
+use Modules\Widgets\Rules\EnumByKey;
 
 class RulesMapper
 {
@@ -152,6 +153,15 @@ class RulesMapper
         };
 
         $enumName = $getProtectedValue($rule, 'type');
+
+        return $this->openApiTransformer->transform(
+            new ObjectType($enumName)
+        );
+    }
+
+    public function enumByKey(Type $type, $rule)
+    {
+        $enumName = (fn() => $this->type)->call($rule);
 
         return $this->openApiTransformer->transform(
             new ObjectType($enumName)

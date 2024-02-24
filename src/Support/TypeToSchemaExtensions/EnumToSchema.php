@@ -24,16 +24,18 @@ class EnumToSchema extends TypeToSchemaExtension
      */
     public function toSchema(Type $type)
     {
-        $name = $type->name;
+        $enumName = $type->name;
 
-        if (! isset($name::cases()[0]->value)) {
+        $cases = collect($enumName::cases());
+        if ($cases->isEmpty()) {
             return new UnknownType("$type->name enum doesnt have values");
         }
 
-        $values = array_map(fn ($s) => $s->value, $name::cases());
+        $valueKey = method_exists($enumName, 'hasKeyAsEnumRule') && $cases->first()->hasKeyAsEnumRule() ? 'name' : 'value';
+        $values = $cases->map(fn($case) => $case->$valueKey);
 
-        $schemaType = is_string($values[0]) ? new StringType : new IntegerType;
-        $schemaType->enum($values);
+        $schemaType = is_string($values->first()) ? new StringType : new IntegerType;
+        $schemaType->enum($values->toArray());
 
         return $schemaType;
     }
