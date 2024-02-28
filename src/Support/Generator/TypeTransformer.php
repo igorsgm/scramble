@@ -52,6 +52,11 @@ class TypeTransformer
         return $this->components;
     }
 
+    public function getInfer()
+    {
+        return $this->infer;
+    }
+
     public function transform(Type $type)
     {
         $openApiType = new StringType();

@@ -3,6 +3,7 @@
 namespace Dedoc\Scramble\Infer\Definition;
 
 use Dedoc\Scramble\Infer\Analyzer\MethodAnalyzer;
+use Dedoc\Scramble\Infer\Reflector\MethodReflector;
 use Dedoc\Scramble\Infer\Scope\GlobalScope;
 use Dedoc\Scramble\Infer\Scope\NodeTypesResolver;
 use Dedoc\Scramble\Infer\Scope\Scope;
@@ -14,6 +15,7 @@ use Dedoc\Scramble\Support\Type\Generic;
 use Dedoc\Scramble\Support\Type\ObjectType;
 use Dedoc\Scramble\Support\Type\TemplateType;
 use Dedoc\Scramble\Support\Type\Type;
+use Dedoc\Scramble\Support\Type\TypeHelper;
 use Dedoc\Scramble\Support\Type\TypeWalker;
 use Dedoc\Scramble\Support\Type\UnknownType;
 use PhpParser\ErrorHandler\Throwing;
@@ -83,9 +85,14 @@ class ClassDefinition
         }
 
         if ($returnType instanceof UnknownType) {
-            // PHP Doc return type is considered only if the code return type is unknown
-            $phpDocType = $this->getMethodDocReturnType($name);
-            $returnType = $phpDocType ? PhpDocTypeHelper::toType($phpDocType) : $returnType;
+            $returnType = $this->getMethodCodeReturnType($name) ?? $returnType;
+
+            if ($returnType instanceof UnknownType) {
+                // PHP Doc return type is considered only if the code return type is unknown
+                $phpDocType = $this->getMethodDocReturnType($name);
+                $returnType = $phpDocType ? PhpDocTypeHelper::toType($phpDocType) : $returnType;
+            }
+
             $this->methods[$name]->type->setReturnType($returnType);
         }
 
@@ -146,6 +153,18 @@ class ClassDefinition
         }
 
         return $methodNode->getAttribute('parsedPhpDoc') ?: new PhpDocNode([]);
+    }
+
+    /**
+     * @TODO: Leverage code of RouteInfo class
+     */
+    public function getMethodCodeReturnType(string $name)
+    {
+        $reflectionReturnType = MethodReflector::make($this->name, $name)->getReflection()?->getReturnType()?->getName();
+
+        return class_exists($reflectionReturnType)
+            ? new ObjectType($reflectionReturnType)
+            : TypeHelper::createTypeFromValue($reflectionReturnType);
     }
 
     private function replaceTemplateInType(Type $type, array $templateTypesMap)

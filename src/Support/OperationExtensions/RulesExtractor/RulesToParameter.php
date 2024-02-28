@@ -50,7 +50,17 @@ class RulesToParameter
                 : $this->getTypeFromObjectRule($type, $rule);
         }, new UnknownType);
 
-        $description = $type->description;
+        if ($type instanceof UnknownType) {
+            /**
+             * @var \Dedoc\Scramble\Infer\Definition\ClassDefinition $classDefinition
+             */
+            $classDefinition = Arr::last($this->openApiTransformer->getInfer()->index->classesDefinitions);
+            if ($newType = $classDefinition?->getPropertyDefinition(Str::camel($this->name))?->type) {
+                $type = $this->openApiTransformer->transform($newType);
+            }
+        }
+
+        $description = $type?->description ?? null;
         $type->setDescription('');
 
         $parameter = Parameter::make($this->name, 'query')
