@@ -13,6 +13,7 @@ use Dedoc\Scramble\Infer\Services\ReferenceTypeResolver;
 use Dedoc\Scramble\PhpDoc\PhpDocTypeHelper;
 use Dedoc\Scramble\Support\Type\Generic;
 use Dedoc\Scramble\Support\Type\ObjectType;
+use Dedoc\Scramble\Support\Type\Reference\MethodCallReferenceType;
 use Dedoc\Scramble\Support\Type\TemplateType;
 use Dedoc\Scramble\Support\Type\Type;
 use Dedoc\Scramble\Support\Type\TypeHelper;
@@ -82,6 +83,10 @@ class ClassDefinition
                 ->mergeAttributes($returnType->attributes());
 
             $this->methods[$name]->type->setReturnType($returnType);
+
+            if ($scopeExceptions = $this->getMethodScopeExceptions($name)) {
+                $this->methods[$name]->type->exceptions = array_merge($this->methods[$name]->type->exceptions, $scopeExceptions);
+            }
         }
 
         if ($returnType instanceof UnknownType) {
@@ -186,5 +191,36 @@ class ClassDefinition
         $this->getMethodDefinition($methodName);
 
         return $this->methodsScopes[$methodName] ?? null;
+    }
+
+    private function getMethodScopeExceptions(string $methodName): array
+    {
+        $scope = $this->methodsScopes[$methodName];
+        $nodeTypes = $scope?->nodeTypesResolver->getNodeTypes() ?? [];
+
+        $internalExceptions = [];
+        $analyzedMethods = [];
+        foreach ($nodeTypes as $nodeType) {
+            if (!is_a($nodeType, MethodCallReferenceType::class, true)) {
+                continue;
+            }
+
+            $calleeClassName = $nodeType->callee?->name;
+            $nodeMethodName = $nodeType->methodName;
+
+            if (
+                ! in_array($calleeClassName.$nodeMethodName, $analyzedMethods)
+                && $calleeDefinition = $scope->index->getClassDefinition($calleeClassName)
+            ) {
+                $analyzedMethods[] = $calleeClassName.$nodeMethodName;
+                $nodeMethodDefinition = $calleeDefinition->methods[$nodeMethodName] ?? null;
+
+                if ($nodeMethodExceptions = $nodeMethodDefinition?->type->exceptions) {
+                    $internalExceptions = array_merge($internalExceptions, $nodeMethodExceptions);
+                }
+            }
+        }
+
+        return $internalExceptions;
     }
 }

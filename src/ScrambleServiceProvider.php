@@ -10,6 +10,7 @@ use Dedoc\Scramble\Infer\Extensions\InferExtension;
 use Dedoc\Scramble\Infer\Scope\Index;
 use Dedoc\Scramble\Infer\Services\FileParser;
 use Dedoc\Scramble\Support\ExceptionToResponseExtensions\AuthorizationExceptionToResponseExtension;
+use Dedoc\Scramble\Support\ExceptionToResponseExtensions\GenericExceptionToResponseExtension;
 use Dedoc\Scramble\Support\ExceptionToResponseExtensions\HttpExceptionToResponseExtension;
 use Dedoc\Scramble\Support\ExceptionToResponseExtensions\NotFoundExceptionToResponseExtension;
 use Dedoc\Scramble\Support\ExceptionToResponseExtensions\ValidationExceptionToResponseExtension;
@@ -17,6 +18,7 @@ use Dedoc\Scramble\Support\Generator\Components;
 use Dedoc\Scramble\Support\Generator\TypeTransformer;
 use Dedoc\Scramble\Support\InferExtensions\AbortHelpersExceptionInfer;
 use Dedoc\Scramble\Support\InferExtensions\ArrayKeysReturnTypeExtension;
+use Dedoc\Scramble\Support\InferExtensions\GenericExceptionInfer;
 use Dedoc\Scramble\Support\InferExtensions\JsonResourceCallsTypeInfer;
 use Dedoc\Scramble\Support\InferExtensions\JsonResourceCreationInfer;
 use Dedoc\Scramble\Support\InferExtensions\JsonResourceTypeInfer;
@@ -84,6 +86,7 @@ class ScrambleServiceProvider extends PackageServiceProvider
                     [
                         new PossibleExceptionInfer(),
                         new AbortHelpersExceptionInfer(),
+                        new GenericExceptionInfer(),
 
                         new JsonResourceCallsTypeInfer(),
                         new JsonResourceCreationInfer(),
@@ -148,6 +151,7 @@ class ScrambleServiceProvider extends PackageServiceProvider
                     ValidationExceptionToResponseExtension::class,
                     AuthorizationExceptionToResponseExtension::class,
                     NotFoundExceptionToResponseExtension::class,
+                    GenericExceptionToResponseExtension::class,
                     HttpExceptionToResponseExtension::class,
                 ]),
             );

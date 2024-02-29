@@ -13,6 +13,11 @@ class NodeTypesResolver
 {
     private $nodeTypes = [];
 
+    public function getNodeTypes(): array
+    {
+        return $this->nodeTypes;
+    }
+
     public function hasType(Node $node): bool
     {
         $nodeId = spl_object_id($node);

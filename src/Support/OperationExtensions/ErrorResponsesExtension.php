@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Spatie\LaravelData\Data;
 
 /**
  * This extension is responsible for adding exceptions to the method return type
@@ -70,7 +71,7 @@ class ErrorResponsesExtension extends OperationExtension
 
     private function attachCustomRequestExceptions(FunctionType $methodType)
     {
-        if (! $formRequest = collect($methodType->arguments)->first(fn (Type $arg) => $arg->isInstanceOf(FormRequest::class))) {
+        if (! $formRequest = collect($methodType->arguments)->first(fn (Type $arg) => $arg->isInstanceOf(FormRequest::class) || $arg->isInstanceOf(Data::class))) {
             return;
         }
 
