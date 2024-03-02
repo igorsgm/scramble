@@ -18,6 +18,7 @@ use Dedoc\Scramble\Support\Type\StringType;
 use Dedoc\Scramble\Support\Type\Union;
 use Dedoc\Scramble\Support\Type\UnknownType;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Enumerable;
 use PHPStan\PhpDocParser\Ast\ConstExpr\ConstExprFloatNode;
 use PHPStan\PhpDocParser\Ast\ConstExpr\ConstExprIntegerNode;
 use PHPStan\PhpDocParser\Ast\ConstExpr\ConstExprStringNode;
@@ -63,7 +64,10 @@ class PhpDocTypeHelper
         }
 
         if ($type instanceof GenericTypeNode) {
-            if (in_array($type->type->name, ['array', 'non-empty-array', 'Collection']) || is_a($type->type->name, Collection::class, true)) {
+            if (in_array($type->type->name, ['array', 'non-empty-array', 'Collection', 'Enumerable'])
+                || is_a($type->type->name, Enumerable::class, true)
+                || is_a($type->type->name, Collection::class, true)
+            ) {
                 return static::toType(new ArrayShapeNode(
                     array_map(
                         fn ($type) => new ArrayShapeItemNode(null, false, $type),
@@ -140,7 +144,7 @@ class PhpDocTypeHelper
             // @todo: Scalar variables are those containing an int, float, string or bool.
             return new StringType;
         }
-        if (in_array($type->name, ['array', 'non-empty-array', 'Collection'])) {
+        if (in_array($type->name, ['array', 'non-empty-array', 'Collection', 'Enumerable'])) {
             return new ArrayType;
         }
         if ($type->name === 'object') {

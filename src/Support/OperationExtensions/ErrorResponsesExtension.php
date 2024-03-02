@@ -7,13 +7,17 @@ use Dedoc\Scramble\Support\Generator\Operation;
 use Dedoc\Scramble\Support\Generator\Parameter;
 use Dedoc\Scramble\Support\RouteInfo;
 use Dedoc\Scramble\Support\Type\FunctionType;
+use Dedoc\Scramble\Support\Type\Generic;
 use Dedoc\Scramble\Support\Type\Literal\LiteralBooleanType;
+use Dedoc\Scramble\Support\Type\Literal\LiteralIntegerType;
+use Dedoc\Scramble\Support\Type\Literal\LiteralStringType;
 use Dedoc\Scramble\Support\Type\ObjectType;
 use Dedoc\Scramble\Support\Type\TemplateType;
 use Dedoc\Scramble\Support\Type\Type;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Routing\Exceptions\BackedEnumCaseNotFoundException;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Spatie\LaravelData\Data;
@@ -32,6 +36,7 @@ class ErrorResponsesExtension extends OperationExtension
 
         $this->attachNotFoundException($operation, $methodType);
         $this->attachAuthorizationException($routeInfo, $methodType);
+        $this->attachEnumRequestExceptions($methodType);
         $this->attachCustomRequestExceptions($methodType);
     }
 
@@ -66,6 +71,30 @@ class ErrorResponsesExtension extends OperationExtension
         $methodType->exceptions = [
             ...$methodType->exceptions,
             new ObjectType(AuthorizationException::class),
+        ];
+    }
+
+    private function attachEnumRequestExceptions(FunctionType $methodType)
+    {
+        if (!$formRequest = collect($methodType->arguments)->first(fn(Type $arg
+        ) => $arg->isInstanceOf(\UnitEnum::class) || $arg->isInstanceOf(\BackedEnum::class))) {
+            return;
+        }
+
+        $formRequest = $formRequest instanceof ObjectType
+            ? $formRequest
+            : ($formRequest instanceof TemplateType ? $formRequest->is : null);
+
+        if (!$formRequest || !enum_exists($formRequest->name)) {
+            return;
+        }
+
+        $methodType->exceptions = [
+            ...$methodType->exceptions,
+            new Generic(BackedEnumCaseNotFoundException::class, [
+                new LiteralIntegerType(404),
+                new LiteralStringType("Case [string] not found on Backed Enum [$formRequest->name]"),
+            ]),
         ];
     }
 

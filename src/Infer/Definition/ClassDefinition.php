@@ -90,12 +90,12 @@ class ClassDefinition
         }
 
         if ($returnType instanceof UnknownType) {
-            $returnType = $this->getMethodCodeReturnType($name) ?? $returnType;
+            // PHP Doc return type is considered only if the code return type is unknown
+            $phpDocType = $this->getMethodDocReturnType($name);
+            $returnType = $phpDocType ? PhpDocTypeHelper::toType($phpDocType) : $returnType;
 
             if ($returnType instanceof UnknownType) {
-                // PHP Doc return type is considered only if the code return type is unknown
-                $phpDocType = $this->getMethodDocReturnType($name);
-                $returnType = $phpDocType ? PhpDocTypeHelper::toType($phpDocType) : $returnType;
+                $returnType = $this->getMethodCodeReturnType($name) ?? $returnType;
             }
 
             $this->methods[$name]->type->setReturnType($returnType);
@@ -201,11 +201,11 @@ class ClassDefinition
         $internalExceptions = [];
         $analyzedMethods = [];
         foreach ($nodeTypes as $nodeType) {
-            if (!is_a($nodeType, MethodCallReferenceType::class, true)) {
+            if (!is_a($nodeType, MethodCallReferenceType::class, true) || ! isset($nodeType->callee->name)) {
                 continue;
             }
 
-            $calleeClassName = $nodeType->callee?->name;
+            $calleeClassName = $nodeType->callee->name;
             $nodeMethodName = $nodeType->methodName;
 
             if (
